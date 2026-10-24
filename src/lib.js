@@ -23,12 +23,12 @@ export function useActivities(){
   const logs=useDB("access_logs"),st=useDB("students");
   const students=st.data||{};
   const rows=useMemo(()=>Object.entries(logs.data||{}).map(([id,a])=>{
-    const vis=a.user_type==="visitor",s=students[a.student_id]||{},veh=s.vehicles?.[a.card_uid]||{},d=a.visitor_data||{};
-    return {...a,id,
-      name:a.needs_details?"Unidentified":vis?d.name||"Visitor":s.name||"N/A",
-      vtype:(vis?d.vehicle_type:veh.type)||"N/A",
-      plate:(vis?d.plate_number:veh.plate_number)||"N/A",
-      kind:a.needs_details?"pending":vis?"visitor":isStaff(a.student_id||"",s)?"staff":"student",
+    const pend=!!(a.needs_details||a.user_type==="admin"),vis=a.user_type==="visitor",man=!!(a.manual_entry||a.manual_card||a.reader==="MANUAL"||a.user_type==="admin"),s=students[a.student_id]||{},veh=s.vehicles?.[a.card_uid]||{},d=a.visitor_data||{};
+    return {...a,id,needs_details:pend,manual:man,unreg:man&&!vis&&!pend&&!students[a.student_id],
+      name:pend?"Unidentified":vis?d.name||"Visitor":s.name||d.name||"N/A",
+      vtype:(vis?d.vehicle_type:veh.type||d.vehicle_type)||"N/A",
+      plate:(vis?d.plate_number:veh.plate_number||d.plate_number)||"N/A",
+      kind:pend?"pending":vis?"visitor":isStaff(a.student_id||"",s)?"staff":"student",
       label:!a.granted?"Denied":a.access_type==="EXIT"?"Exit":a.access_type==="ENTRANCE"?"Entry":a.access_type||"Unknown",
       time:fmt(a),
       date:a.timestamp?new Date(a.timestamp).toLocaleDateString("en-CA"):""};

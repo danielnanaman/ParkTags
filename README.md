@@ -29,3 +29,12 @@ expiry and parked-status checks — and push this to `access_logs`:
   "timestamp": {".sv": "timestamp"}, "manual_card": true, "needs_details": true }
 ```
 The web app lists these as **Needs details**; the guard fills in the manual-entry form (remarks optional) and the log is updated in place.
+
+### Admin override card (current firmware)
+Logs with `user_type: "admin"` (written by the sketch's `logManualEntry`) are treated as **Needs details** automatically,
+so `needs_details: true` is optional. Saving details replaces `user_type` with `student` or `visitor`, which clears the flag.
+
+### Manual entries
+Activity has a **Source** filter (all / manual entries / gate scans). In the manual-entry form the ID doesn’t have to be registered:
+name, vehicle type and plate are typed in and stored on the log only (nothing is written to `students`). Once that ID is registered,
+the log shows the registered name automatically. A registered user can also be logged with a vehicle that isn’t registered yet.

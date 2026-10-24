@@ -77,43 +77,47 @@ export function VehicleModal({sid,vid,vehicles,onClose}){
 }
 
 // New manual entry, or (when `log` is given) completes a gate-card tap that has no details yet.
+// The ID doesn't have to be registered: details are typed in and saved on the log only.
 export function ActivityModal({students,log,onClose}){
   const {user}=useAuth();
   const [v,f,setV]=useForm({kind:"student",sid:"",vid:"",vname:"",vtype:"",custom:"",plate:"",remarks:"",
     access:log?.access_type==="EXIT"?"EXIT":"ENTRANCE",ts:""});
-  const stu=students[v.sid.trim()];
+  const sid=v.sid.trim(),stu=students[sid],visitor=v.kind==="visitor";
+  const unreg=!visitor&&!!sid&&!stu;           // ID not in the database (yet)
+  const typed=visitor||unreg;                  // name typed in
+  const free=typed||v.vid==="__other";         // vehicle details typed in
   const [busy,submit]=useSubmit(async()=>{
-    let d;
-    if(v.kind==="student"){
-      if(!stu?.vehicles?.[v.vid])throw new Error("Choose a registered ID and one of its vehicles");
-      d={student_id:v.sid.trim(),card_uid:v.vid};
+    let d,registered=false;
+    if(free){
+      const plate=v.plate.trim(),tag=plate.replace(/\s+/g,"_").toUpperCase();
+      d={student_id:visitor?`VISITOR_${Date.now()}`:sid,card_uid:`${visitor?"VISITOR":"MANUAL"}_${tag}`,
+        visitor_data:{name:typed?v.vname.trim():stu?.name||"",vehicle_type:v.vtype==="Other"?v.custom.trim():v.vtype,plate_number:plate}};
     }else{
-      const plate=v.plate.trim();
-      d={student_id:`VISITOR_${Date.now()}`,card_uid:`VISITOR_${plate.replace(/\s+/g,"_").toUpperCase()}`,
-        visitor_data:{name:v.vname.trim(),vehicle_type:v.vtype==="Other"?v.custom.trim():v.vtype,plate_number:plate}};
+      if(!stu?.vehicles?.[v.vid])throw new Error("Choose one of this user’s registered vehicles");
+      d={student_id:sid,card_uid:v.vid};registered=true;
     }
     const data={...d,user_type:v.kind,access_type:v.access,remarks:v.remarks.trim()||null,recorded_by:user?.email||null};
     if(log)await update(ref(db,`access_logs/${log.id}`),{...data,needs_details:null,manual_card_uid:log.card_uid||null});
     else await push(ref(db,"access_logs"),{...data,granted:true,reader:"MANUAL",manual_entry:true,timestamp:v.ts?new Date(v.ts).getTime():Date.now()});
-    if(v.kind==="student")await set(ref(db,`students/${d.student_id}/vehicles/${d.card_uid}/current_status`),v.access==="ENTRANCE"?"parked":"not parked");
+    if(registered)await set(ref(db,`students/${d.student_id}/vehicles/${d.card_uid}/current_status`),v.access==="ENTRANCE"?"parked":"not parked");
     return log?"Details saved":"Activity recorded";
   },onClose);
   return <Modal title={log?"Add details":"Manual entry"} onClose={onClose}><form onSubmit={submit}>
     {log&&<p className="note">Gate card tap · <b>{log.label}</b> · {log.time}<br/>Card {log.card_uid||"N/A"}. Add who came through so the log is complete.</p>}
     <div className="seg">{[["student","Student / Staff"],["visitor","Visitor"]].map(([k,l])=>
       <button type="button" key={k} className={"btn"+(v.kind===k?" on":"")} onClick={()=>setV(s=>({...s,kind:k}))}>{l}</button>)}</div>
-    {v.kind==="student"?<>
-      <Field label="Student / Staff ID" hint={v.sid&&!stu?"No registered user with this ID":stu?.name}>
+    {!visitor&&<>
+      <Field label="Student / Staff ID" hint={stu?.name}>
         <input list="sids" {...f("sid")} required autoComplete="off"/>
         <datalist id="sids">{Object.entries(students).map(([id,s])=><option key={id} value={id}>{s.name}</option>)}</datalist></Field>
-      <Field label="Vehicle"><select {...f("vid")} required>
-        <option value="">{stu?"Select vehicle…":"Enter a valid ID first"}</option>
-        {Object.entries(stu?.vehicles||{}).map(([id,x])=><option key={id} value={id}>{x.plate_number} · {x.brand} {x.model}</option>)}</select></Field>
-    </>:<>
-      <Field label="Visitor name"><input {...f("vname")} required/></Field>
-      <TypeSelect f={f} v={v}/>
-      <Field label="Plate number"><input {...f("plate")} required/></Field>
+      {unreg&&<p className="note">Not registered yet — that’s fine. The entry is saved with the details below and picks up their registered name once they’re registered.</p>}
+      {!unreg&&<Field label="Vehicle"><select {...f("vid")} required>
+        <option value="">{stu?"Select vehicle…":"Enter an ID first"}</option>
+        {Object.entries(stu?.vehicles||{}).map(([id,x])=><option key={id} value={id}>{x.plate_number} · {x.brand} {x.model}</option>)}
+        {stu&&<option value="__other">Vehicle not registered…</option>}</select></Field>}
     </>}
+    {typed&&<Field label={visitor?"Visitor name":"Full name"}><input {...f("vname")} required/></Field>}
+    {free&&<><TypeSelect f={f} v={v}/><Field label="Plate number"><input {...f("plate")} required/></Field></>}
     <div className="row2">
       <Field label="Entry or exit"><select {...f("access")}><option value="ENTRANCE">Entry</option><option value="EXIT">Exit</option></select></Field>
       {!log&&<Field label="Time" hint="Leave blank for now"><input type="datetime-local" {...f("ts")}/></Field>}</div>

@@ -76,9 +76,9 @@ export const Pager=({p,total})=><div className="pager">
 
 const res={Entry:"ok",Exit:"",Denied:"bad"};
 export const activityCols=[
-  {h:"User ID",c:r=>r.student_id||"N/A"},{h:"Name",c:r=>r.name},{h:"Vehicle ID",c:r=>r.card_uid||"N/A"},
+  {h:"User ID",c:r=>r.student_id||"N/A"},{h:"Name",c:r=><span>{r.name}{r.unreg&&<> <Badge cls="warn">Not registered</Badge></>}</span>},{h:"Vehicle ID",c:r=>r.card_uid||"N/A"},
   {h:"Type",c:r=>r.vtype},{h:"Plate",c:r=>r.plate},{h:"Time",c:r=>r.time},
-  {h:"Result",c:r=><span><Badge cls={res[r.label]}>{r.label}</Badge>{r.needs_details&&<> <Badge cls="warn">Needs details</Badge></>}</span>}];
+  {h:"Result",c:r=><span><Badge cls={res[r.label]}>{r.label}</Badge>{r.needs_details&&<> <Badge cls="warn">Needs details</Badge></>}{r.manual&&<> <Badge cls="mut">Manual</Badge></>}</span>}];
 export const withDetails=(cols,fn)=>[...cols,{h:"",c:r=>r.needs_details?<button className="btn sm pri" onClick={()=>fn(r)}>Add details</button>:null}];
 export const userCols=[
   {h:"Name",c:r=><Link to={`/users/${r.id}`}>{r.name||"N/A"}</Link>},{h:"ID",c:r=>r.id},
